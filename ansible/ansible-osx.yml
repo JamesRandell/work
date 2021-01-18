@@ -1,0 +1,64 @@
+﻿ - name: Database
+   hosts: localhost
+   connection: local
+   gather_facts: no
+   tasks:
+    - include_vars: main.yml
+    - name: Make sure Docker is present
+      become: true
+      pip:
+        name: docker
+        state: present
+    - name: Create docker network
+      docker_network:
+        name: "{{ mysql_network }}"
+        state: present
+    - name: Get MySQL Image
+      docker_image:
+        name: mysql/mysql-server
+        source: pull
+    - name: Build MySQL Image
+      docker_image:
+       name: mysqlimage
+       build:
+         path: "{{playbook_dir}}/docker/mysql/"
+         pull: yes
+       tag: latest
+       source: build
+       force_source: yes
+       state: present
+    - name: Run MySQL Image
+      docker_container:
+        name: Start-MySQL
+        state: started
+        image: mysql/mysql-server
+        ports:
+         - "8306:3306"
+        env:
+          MYSQL_ROOT_PASSWORD: "{{ mysql_root_password }}"
+        volumes:
+         - "{{playbook_dir}}/volume:/mysql"
+    - name: Install or update pip
+      pip:
+        name: pip
+        state: latest
+    - name: install the right fucking version of MySQL PIP client
+      become: true
+      pip:
+        name: pymysql
+        state: present
+    - name: Create mysql user
+      mysql_user: 
+        login_password={{ mysql_root_password }}
+        name={{ mysql_user }} 
+        password={{ mysql_password }} 
+        priv=*:ALL
+        host=*
+    - name: Ensure no user named 'sally' exists at all
+      mysql_user:
+        name: sally
+        host_all: yes
+        state: absent
+    - name: Check if container is running
+      shell: docker ps
+    
